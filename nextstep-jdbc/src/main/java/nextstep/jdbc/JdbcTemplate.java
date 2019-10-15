@@ -1,14 +1,18 @@
 package nextstep.jdbc;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 
 public class JdbcTemplate<T> {
+    private static final Logger logger = LoggerFactory.getLogger(JdbcTemplate.class);
+
     private DataSource dataSource;
 
     public JdbcTemplate(DataSource dataSource) {
@@ -23,30 +27,27 @@ public class JdbcTemplate<T> {
             for (int i = 0; i < arg.length; i++) {
                 preparedStatement.setObject(i + 1, arg[i]);
             }
-
             preparedStatement.executeUpdate();
+
         } catch (SQLException e) {
-            e.printStackTrace();
+            logger.error("{}", e);
         }
     }
 
     public List<T> queryForList(String sql, RowMapper<T> rowMapper) {
-        List<T> lists = new ArrayList<>();
+        return (List<T>) abc(sql, rowMapper, new ListStrategy<T>());
+    }
 
+    private Object abc(String sql, RowMapper<T> rowMapper, Strategy<T> strategy) {
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+             PreparedStatement preparedStatement = connection.prepareStatement(sql);
+             ResultSet resultSet = preparedStatement.executeQuery()) {
 
-            ResultSet resultSet = preparedStatement.executeQuery();
-            while (resultSet.next()) {
-                T object = rowMapper.mapRow(resultSet);
-                lists.add(object);
-            }
+            return strategy.execute(rowMapper,resultSet);
 
-            return lists;
         } catch (SQLException e) {
-            e.printStackTrace();
+            logger.error("{}", e);
         }
-
         return null;
     }
 }
